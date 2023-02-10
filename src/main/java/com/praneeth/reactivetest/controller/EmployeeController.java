@@ -1,6 +1,7 @@
 package com.praneeth.reactivetest.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,6 +37,12 @@ public class EmployeeController {
     @PostMapping
     private Mono<Employee> createEmployee(@RequestBody Employee employee) {
         return employeeRepository.createEmployee(employee);
+    }
+
+    // delete employee
+    @DeleteMapping("/{id}")
+    private Mono<Void> deleteEmployee(@PathVariable String id) {
+        return employeeRepository.deleteEmployee(id);
     }
 
     @GetMapping("/test")

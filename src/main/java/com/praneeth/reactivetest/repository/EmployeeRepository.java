@@ -46,4 +46,9 @@ public class EmployeeRepository {
         employees.add(employee);
         return Mono.just(employee);
     }
+
+    public Mono<Void> deleteEmployee(String id) {
+        employees.removeIf(employee -> employee.getId().equals(id));
+        return Mono.empty();
+    }
 }
