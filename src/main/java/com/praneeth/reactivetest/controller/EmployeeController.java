@@ -7,13 +7,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
@@ -61,6 +64,8 @@ public class EmployeeController {
         return Mono.just("Hello");
     }
 
+    // static routing
+
     @Bean
     public RouterFunction<ServerResponse> htmlRouter(@Value("classpath:/public/index.html") Resource html) {
         return RouterFunctions.route(RequestPredicates.GET("/"),
@@ -71,6 +76,8 @@ public class EmployeeController {
     public RouterFunction<ServerResponse> imgRouter() {
         return RouterFunctions.resources("/img/**", new ClassPathResource("/static/img/"));
     }
+
+    // error handling
 
     private Mono<String> testError(ServerRequest request) {
         try {
@@ -87,5 +94,20 @@ public class EmployeeController {
             .contentType(MediaType.TEXT_PLAIN)
             .bodyValue(s));
     }    
+
+    // error 404 if not found
+
+    // Default Return Status
+    @GetMapping(
+        value = "/ok",
+        produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public Flux<String> ok() {
+        return Flux.just("ok");
+    }
+
+    // Changing the Status Programmatically
+    // response.setStatusCode(HttpStatus.ACCEPTED);
+    // return Flux.just("accepted");
 
 }
