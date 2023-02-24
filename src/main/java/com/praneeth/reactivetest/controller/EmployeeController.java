@@ -95,8 +95,6 @@ public class EmployeeController {
             .bodyValue(s));
     }    
 
-    // error 404 if not found
-
     // Default Return Status
     @GetMapping(
         value = "/ok",
