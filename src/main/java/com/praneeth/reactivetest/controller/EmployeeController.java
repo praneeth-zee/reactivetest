@@ -1,23 +1,25 @@
 package com.praneeth.reactivetest.controller;
 
-import java.util.logging.Handler;
+import java.time.Duration;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
@@ -37,14 +39,30 @@ public class EmployeeController {
     @Autowired
     private EmployeeRepository employeeRepository;
 
-    @GetMapping("/{id}")
-    private Mono<Employee> getEmployeeById(@PathVariable String id) {
-        return employeeRepository.findEmployeeById(id);
+    @GetMapping("/slow-service-employees")
+    private Flux<Employee> slowServiceEmployees() {
+        return employeeRepository.findAllEmployees().delayElements(Duration.ofMillis(2000));
+    }
+    @GetMapping("/get-employees-slowly")
+    private Flux<Employee> getEmployeesSlowly() {
+        final String uri = "http://localhost:8080/employees/slow-service-employees";
+        RestTemplate restTemplate = new RestTemplate();
+        ResponseEntity<List<Employee>> response = restTemplate.exchange(
+          uri, HttpMethod.GET, null,
+          new ParameterizedTypeReference<List<Employee>>(){});
+    
+        List<Employee> result = response.getBody();
+        return Flux.fromIterable(result);
     }
 
     @GetMapping // for /employees
     private Flux<Employee> getAllEmployees() {
         return employeeRepository.findAllEmployees();
+    }
+
+    @GetMapping("/{id}")
+    private Mono<Employee> getEmployeeById(@PathVariable String id) {
+        return employeeRepository.findEmployeeById(id);
     }
 
     // create or update employee
@@ -89,11 +107,11 @@ public class EmployeeController {
     
     public Mono<ServerResponse> handleRequest(ServerRequest request) {
         return testError(request)
-            .onErrorReturn("Hello Stranger")
-            .flatMap(s -> ServerResponse.ok()
-            .contentType(MediaType.TEXT_PLAIN)
-            .bodyValue(s));
-    }    
+                .onErrorReturn("Hello Stranger")
+                .flatMap(s -> ServerResponse.ok()
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .bodyValue(s));
+    }
 
     // Default Return Status
     @GetMapping(

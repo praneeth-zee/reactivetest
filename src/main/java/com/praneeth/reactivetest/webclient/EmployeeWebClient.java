@@ -1,14 +1,53 @@
 package com.praneeth.reactivetest.webclient;
 
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import com.praneeth.reactivetest.model.Employee;
 
+import io.netty.channel.ChannelOption;
+import io.netty.handler.timeout.ReadTimeoutHandler;
+import io.netty.handler.timeout.WriteTimeoutHandler;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
 public class EmployeeWebClient {
 
-    WebClient client = WebClient.create("http://localhost:8080");
+    private WebClient client;
+
+    public EmployeeWebClient(WebClient client) {
+        this.client = client;
+    }
+
+    public static String LOCALHOST_URL = "http://localhost:8080";
+
+    public static EmployeeWebClient create() {
+        HttpClient httpClient = HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
+            .responseTimeout(Duration.ofMillis(5000))
+            .doOnConnected(conn -> conn.addHandlerLast(new ReadTimeoutHandler(5000, TimeUnit.MILLISECONDS))
+                    .addHandlerLast(new WriteTimeoutHandler(5000, TimeUnit.MILLISECONDS)));
+
+        WebClient client = WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(httpClient))
+            .build();
+
+        return new EmployeeWebClient(client);
+    }
+
+    public static WebClient.Builder bindToServer() {
+        HttpClient httpClient = HttpClient.create()
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
+            .responseTimeout(Duration.ofMillis(5000))
+            .doOnConnected(conn -> conn.addHandlerLast(new ReadTimeoutHandler(5000, TimeUnit.MILLISECONDS))
+                .addHandlerLast(new WriteTimeoutHandler(5000, TimeUnit.MILLISECONDS)));
+        
+        return WebClient.builder()
+            .clientConnector(new ReactorClientHttpConnector(httpClient));
+    }    
 
     public Mono<Employee> getEmployeeById(String id) {
         Mono<Employee> employeeMono = client.get()
