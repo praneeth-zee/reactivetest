@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.server.RequestPredicates;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.RouterFunctions;
@@ -48,12 +49,25 @@ public class EmployeeController {
         final String uri = "http://localhost:8080/employees/slow-service-employees";
         RestTemplate restTemplate = new RestTemplate();
         ResponseEntity<List<Employee>> response = restTemplate.exchange(
-          uri, HttpMethod.GET, null,
-          new ParameterizedTypeReference<List<Employee>>(){});
-    
+            uri, HttpMethod.GET, null,
+            new ParameterizedTypeReference<List<Employee>>() {} );
         List<Employee> result = response.getBody();
         return Flux.fromIterable(result);
     }
+    
+    @GetMapping("/get-employees-non-blocking")
+    private Flux<Employee> getEmployeesNonBlocking() {
+        final String uri = "http://localhost:8080/employees/slow-service-employees";
+        Flux<Employee> employeeFlux = WebClient.create()
+                .get()
+                .uri(uri)
+                .retrieve()
+                .bodyToFlux(Employee.class);
+        // employeeFlux.subscribe(System.out::println);
+        return employeeFlux;
+    }
+
+    // ___________________________________________________________________
 
     @GetMapping // for /employees
     private Flux<Employee> getAllEmployees() {
