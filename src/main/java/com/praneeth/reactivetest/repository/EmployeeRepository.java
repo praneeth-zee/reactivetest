@@ -1,5 +1,6 @@
 package com.praneeth.reactivetest.repository;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -50,5 +51,23 @@ public class EmployeeRepository {
     public Mono<Void> deleteEmployee(String id) {
         employees.removeIf(employee -> employee.getId().equals(id));
         return Mono.empty();
+    }
+
+    // getEmployeesStream
+    private Flux<Employee> getEmployeesStream() {
+        return Flux.fromIterable(employees).delayElements(Duration.ofSeconds(1)).doOnNext(employee -> {
+            System.out.println("Employee: " + employee);
+        }).map(employee -> {
+            employee.setFirstName(employee.getFirstName().toUpperCase());
+            return employee;
+        });
+    }
+
+    public Flux<Employee> loadAllEmployeesStream() {
+        long start = System.currentTimeMillis();
+        Flux<Employee> employeeFlux = getEmployeesStream();
+        long end = System.currentTimeMillis();
+        System.out.println("Time taken: " + (end - start));
+        return employeeFlux;
     }
 }
