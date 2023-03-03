@@ -1,13 +1,20 @@
 package com.praneeth.reactivetest;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.web.reactive.config.EnableWebFlux;
 
-@SpringBootApplication
+import reactor.ipc.netty.NettyContext;
+
+@ComponentScan(basePackages = {"com.praneeth.reactivetest.security"})
+@EnableWebFlux
 public class ReactivetestApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ReactivetestApplication.class, args);
+		try (AnnotationConfigApplicationContext context =
+					new AnnotationConfigApplicationContext(ReactivetestApplication.class)) {
+            context.getBean(NettyContext.class).onClose().block();
+        }
 	}
 
 }

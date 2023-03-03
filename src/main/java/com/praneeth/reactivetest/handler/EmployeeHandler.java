@@ -25,18 +25,20 @@ public class EmployeeHandler {
     public Mono<ServerResponse> getEmployee(ServerRequest request) {
         String name = request.pathVariable("id");
         Mono<Employee> employeeMono = employeeRepository.findEmployeeById(name);
-        Employee employee = employeeMono.block();  // convert Mono<Employee> to Employee
+        Employee employee = employeeMono.block(); // convert Mono<Employee> to Employee
         if (employee == null) {
             return ServerResponse.notFound().build();
         } else {
             return ServerResponse.ok().body(BodyInserters.fromValue(employee));
         }
     }
+
     public Mono<ServerResponse> loadEmployees(ServerRequest request) {
         Flux<Employee> employees = employeeRepository.findAllEmployees();
         employees.subscribe(System.out::println);
         Flux<ServerSentEvent<Employee>> serverSentEvents = employees
                 .map(employee -> ServerSentEvent.builder(employee).build());
-        return ServerResponse.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(serverSentEvents, ServerSentEvent.class);
+        return ServerResponse.ok().contentType(MediaType.TEXT_EVENT_STREAM).body(serverSentEvents,
+                ServerSentEvent.class);
     }
 }

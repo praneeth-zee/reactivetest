@@ -24,7 +24,7 @@ public class EmployeeWebClient {
 
     public static String LOCALHOST_URL = "http://localhost:8080";
 
-    public static EmployeeWebClient create() {
+    public EmployeeWebClient create() {
         HttpClient httpClient = HttpClient.create()
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 5000)
             .responseTimeout(Duration.ofMillis(5000))

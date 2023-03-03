@@ -1,0 +1,213 @@
+
+- logging
+
+LOG.info(String.format("Calling getUser(%d)", id));
+
+- merging flux
+public Flux fetchUserAndOtherUser(int id) {
+    return Flux.merge(getUser(id), getOtherUser(id));
+}
+
+using flux with list
+public Flux fetchUsers(List userIds) {
+    return Flux.fromIterable(userIds)
+        .flatMap(this::getUser);
+}
+
+- zip
+public Flux fetchUserAndOtherUser(int id) {
+    // return Flux.zip(getUser(id), getOtherUser(id), UserWithItem::new);
+    // or 
+    return Flux.zip(getUser(id), getOtherUser(id), (user, otherUser) -> new UserWithItem(user, otherUser));
+}
+
+- flatmap
+public Flux fetchUserAndOtherUser(int id) {
+    return getUser(id)
+        .flatMap(user -> getOtherUser(id)
+            .map(otherUser -> new UserWithItem(user, otherUser)));
+}
+
+- filter
+public Flux fetchUserAndOtherUser(int id) {
+    return getUser(id)
+        .filter(user -> user.getAge() > 18)
+        .flatMap(user -> getOtherUser(id)
+            .map(otherUser -> new UserWithItem(user, otherUser)));
+}
+
+- retry
+public Flux fetchUserAndOtherUser(int id) {
+    return getUser(id)
+        .retry(3)
+        .flatMap(user -> getOtherUser(id)
+            .map(otherUser -> new UserWithItem(user, otherUser)));
+}
+
+- timeout
+public Flux fetchUserAndOtherUser(int id) {
+    return getUser(id)
+        .timeout(Duration.ofSeconds(1))
+        .flatMap(user -> getOtherUser(id)
+            .map(otherUser -> new UserWithItem(user, otherUser)));
+}
+
+- delay
+public Flux fetchUserAndOtherUser(int id) {
+    return getUser(id)
+        .delayElement(Duration.ofSeconds(1))
+        .flatMap(user -> getOtherUser(id)
+            .map(otherUser -> new UserWithItem(user, otherUser)));
+}
+
+- @Test for testing
+@Test
+public void test() {
+    Flux<String> flux = Flux.just("a", "b", "c");
+    StepVerifier.create(flux)
+        .expectNext("a")
+        .expectNext("b")
+        .expectNext("c")
+        .verifyComplete();
+}
+
+_________________________________________________________________________________________________________________
+
+security
+
+--- CORS ----
+@Configuration
+@EnableWebFlux
+public class CorsGlobalConfiguration implements WebFluxConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry corsRegistry) {
+        corsRegistry.addMapping("/**")
+          .allowedOrigins("http://allowed-origin.com")
+          .allowedMethods("PUT")
+          .maxAge(3600);
+    }
+}
+
+--- Oauth ---
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-security</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-webflux</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.security</groupId>
+    <artifactId>spring-security-oauth2-client</artifactId>
+</dependency>
+
+@RestController
+public class MainController {
+    
+    @GetMapping("/")
+    public Mono<String> index(@AuthenticationPrincipal Mono<OAuth2User> oauth2User) {
+       return oauth2User
+        .map(OAuth2User::getName)
+        .map(name -> String.format("Hi, %s", name));
+    }
+}
+
+@Bean
+public WebClient webClient(ReactiveClientRegistrationRepository clientRegistrationRepo, 
+  ServerOAuth2AuthorizedClientRepository authorizedClientRepo) {
+    ServerOAuth2AuthorizedClientExchangeFilterFunction filter = 
+      new ServerOAuth2AuthorizedClientExchangeFilterFunction(clientRegistrationRepo, authorizedClientRepo);
+    
+    return WebClient.builder().filter(filter).build();
+}
+
+@Autowired
+private WebClient webClient;
+
+@GetMapping("/foos/{id}")
+public Mono<Foo> getFooResource(@RegisteredOAuth2AuthorizedClient("custom") 
+  OAuth2AuthorizedClient client, @PathVariable final long id){
+    return webClient
+      .get()
+      .uri("http://localhost:8088/spring-security-oauth-resource/foos/{id}", id)
+      .attributes(oauth2AuthorizedClient(client))
+      .retrieve()
+      .bodyToMono(Foo.class); 
+}
+
+@Autowired
+private WebClient webClient;
+
+@Scheduled(fixedRate = 5000)
+public void logResourceServiceResponse() {
+
+    webClient.get()
+      .uri("http://localhost:8084/retrieve-resource")
+      .retrieve()
+      .bodyToMono(String.class)
+      .map(string 
+        -> "Retrieved using Client Credentials Grant Type: " + string)
+      .subscribe(logger::info);
+}
+
+@RestController
+public class ClientRestController {
+
+    @Autowired
+    WebClient webClient;
+
+    @GetMapping("/auth-code")
+    Mono<String> useOauthWithAuthCode() {
+        Mono<String> retrievedResource = webClient.get()
+          .uri("http://localhost:8084/retrieve-resource")
+          .retrieve()
+          .bodyToMono(String.class);
+        return retrievedResource.map(string ->
+          "We retrieved the following resource using Oauth: " + string);
+    }
+}
+
+@GetMapping("/auth-code-annotated")
+Mono<String> useOauthWithAuthCodeAndAnnotation(
+  @RegisteredOAuth2AuthorizedClient("bael") OAuth2AuthorizedClient authorizedClient) {
+    Mono<String> retrievedResource = webClient.get()
+      .uri("http://localhost:8084/retrieve-resource")
+      .attributes(
+        ServerOAuth2AuthorizedClientExchangeFilterFunction.oauth2AuthorizedClient(authorizedClient))
+      .retrieve()
+      .bodyToMono(String.class);
+    return retrievedResource.map(string -> 
+      "Resource: " + string 
+        + " - Principal associated: " + authorizedClient.getPrincipalName() 
+        + " - Token will expire at: " + authorizedClient.getAccessToken()
+          .getExpiresAt());
+}
+
+
+@Autowired
+WebClient client;
+
+public Mono<String> obtainSecuredResource() {
+    String encodedClientData = 
+      Base64Utils.encodeToString("bael-client-id:bael-secret".getBytes());
+    Mono<String> resource = client.post()
+      .uri("localhost:8085/oauth/token")
+      .header("Authorization", "Basic " + encodedClientData)
+      .body(BodyInserters.fromFormData("grant_type", "client_credentials"))
+      .retrieve()
+      .bodyToMono(JsonNode.class)
+      .flatMap(tokenResponse -> {
+          String accessTokenValue = tokenResponse.get("access_token")
+            .textValue();
+          return client.get()
+            .uri("localhost:8084/retrieve-resource")
+            .headers(h -> h.setBearerAuth(accessTokenValue))
+            .retrieve()
+            .bodyToMono(String.class);
+        });
+    return resource.map(res ->
+      "Retrieved the resource using a manual approach: " + res);
+}
+
